@@ -91,18 +91,6 @@ SCHEME = """<scheme>
                 <required_on_edit>false</required_on_edit>
                 <required_on_create>false</required_on_create>
             </arg>
-            <arg name="sequential_mode">
-                <title>Sequential Mode</title>
-                <description>Whether multiple requests spawned by tokenization are run in parallel or sequentially</description>
-                <required_on_edit>false</required_on_edit>
-                <required_on_create>false</required_on_create>
-            </arg>
-            <arg name="sequential_stagger_time">
-                <title>Sequential Stagger Time</title>
-                <description>An optional stagger time period between sequential requests</description>
-                <required_on_edit>false</required_on_edit>
-                <required_on_create>false</required_on_create>
-            </arg>
         </args>
     </endpoint>
 </scheme>
@@ -159,8 +147,6 @@ def do_run(config):
     request_timeout = int(config.get("request_timeout", 30))
     
     backoff_time = int(config.get("backoff_time", 10))
-    
-    sequential_stagger_time = int(config.get("sequential_stagger_time", 0))
     
     polling_interval = int(config.get("polling_interval", 60))
     
@@ -223,9 +209,6 @@ def do_run(config):
                 time.sleep(float(backoff_time))
                 continue
               
-            if sequential_stagger_time > 0:
-                time.sleep(float(sequential_stagger_time)) 
-       
             time.sleep(float(polling_interval))
     except RuntimeError,e:
         logging.error("Looks like an error: %s" % str(e))

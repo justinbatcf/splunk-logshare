@@ -51,18 +51,6 @@
 					<view name="create" />
 					<key name="exampleText">Polling interval in either seconds or a CRON time format , defaults to 60 seconds.</key>
 				</element>				
-				<element name="sequential_mode" type="checkbox" label="Run multiple requests sequentially ?">
-					<view name="edit" />
-					<view name="create" />
-					<key name="exampleText">Whether multiple requests spawned by tokenization are run in parallel or sequentially,
-						defaults to false (run in parallel)
-					</key>
-				</element>
-				<element name="sequential_stagger_time" type="textfield" label="Sequential Stagger Time">
-					<view name="edit" />
-					<view name="create" />
-					<key name="exampleText">An optional stagger time period between sequential requests.Defaults to 0</key>
-				</element>
 			</elements>
 		</element>
 
