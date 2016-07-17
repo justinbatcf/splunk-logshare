@@ -52,20 +52,20 @@ SCHEME = """<scheme>
             <arg name="zone_name">
                 <title>Domain Name</title>
                 <description>CloudFlare domain to download logs for.</description>
-                <required_on_edit>true</required_on_edit>
+                <required_on_edit>false</required_on_edit>
                 <required_on_create>true</required_on_create>
             </arg>
             <arg name="auth_email">
                 <title>CloudFlare email</title>
                 <description>CloudFlare email address</description>
-                <required_on_edit>true</required_on_edit>
-                <required_on_create>false</required_on_create>
+                <required_on_edit>false</required_on_edit>
+                <required_on_create>true</required_on_create>
             </arg>
             <arg name="auth_key">
                 <title>API Key</title>
                 <description>CloudFlare API key</description>
-                <required_on_edit>true</required_on_edit>
-                <required_on_create>false</required_on_create>
+                <required_on_edit>false</required_on_edit>
+                <required_on_create>true</required_on_create>
             </arg>
             <arg name="last_ray_id">
                 <title>Last ray id</title>
@@ -113,19 +113,24 @@ class CloudFlareEventHandler:
     def __init__(self,**args):
         pass
 
-    def __call__(self, response_object, raw_response_output, req_args):
+    def __call__(self, response_object, raw_response_output, req_args, last_ray_id):
         req = json.loads(raw_response_output)
         last_rayid = 0
 
-        if "rayId" in req:
-	    last_rayid = req['rayId']
+        if "rayId" not in req:
+            return
+
+
+        rayid = req['rayId']
+        if rayid == last_ray_id:
+            return
 
         print json.dumps(req)
 
         if not "params" in req_args:
 	    req_args["params"] = {}
 
-        req_args["params"]["start_id"] = last_rayid
+        req_args["params"]["start_id"] = rayid
 
 def get_current_datetime_for_cron():
     current_dt = datetime.now()
@@ -137,7 +142,6 @@ def do_validate():
     config = get_validation_config() 
     
 def do_run(config):
-    logging.error("Running in CloudFlare!")
     server_uri = config.get("server_uri")
     global SPLUNK_PORT
     global STANZA
@@ -161,16 +165,26 @@ def do_run(config):
     polling_interval = int(config.get("polling_interval", 60))
     
     cloudflare_handler = CloudFlareEventHandler()
-   
+
+    headers = {
+        "x-auth-email": auth_email,
+        "x-auth-key": auth_key,
+    }
+
+    zone_tag = None
+    r = requests.get("https://api.cloudflare.com/client/v4/zones", params={'name': zone_name}, headers=headers).json()
+    for result in r['result']:
+        zone_tag = result['id']
+
+    if not zone_tag:
+        pass
+
     try: 
         req_args = {
             "verify": True,
             "stream": True,
             "timeout": float(request_timeout),
-            "headers": {
-                "x-auth-email": auth_email,
-                "x-auth-key": auth_key,
-            }
+            "headers": headers
         }
 
         while True:
@@ -180,7 +194,7 @@ def do_run(config):
                 req_args['params'] = { 'start': 0 }
 
             try:
-                r = requests.get("https://api.cloudflare.com/client/v4/zones/%s/logs/requests" % zone_name, **req_args)
+                r = requests.get("https://api.cloudflare.com/client/v4/zones/%s/logs/requests" % zone_tag, **req_args)
             except requests.exceptions.Timeout,e:
                 logging.error("HTTP Request Timeout error: %s" % str(e))
                 time.sleep(float(backoff_time))
@@ -196,7 +210,7 @@ def do_run(config):
                     if not line:
                         continue
 
-                    cloudflare_handler(r, line, req_args)
+                    cloudflare_handler(r, line, req_args, last_ray_id)
                     sys.stdout.flush()
 
                 update_rayid(req_args, last_ray_id)
@@ -211,9 +225,8 @@ def do_run(config):
               
             if sequential_stagger_time > 0:
                 time.sleep(float(sequential_stagger_time)) 
-                   
-            if polling_type == 'interval':                         
-                time.sleep(float(polling_interval))
+       
+            time.sleep(float(polling_interval))
     except RuntimeError,e:
         logging.error("Looks like an error: %s" % str(e))
         sys.exit(2) 
