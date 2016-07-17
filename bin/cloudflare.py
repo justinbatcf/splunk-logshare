@@ -163,7 +163,8 @@ def do_run(config):
         zone_tag = result['id']
 
     if not zone_tag:
-        pass
+        logging.error("Zone not found: %s." % zone_name)
+        sys.exit(2)
 
     try: 
         req_args = {
